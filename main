@@ -1,0 +1,92 @@
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+
+columns = [
+    'fLength','fWidth','fSize','fConc','fConc1','fAsym',
+    'fM3Long','fM3Trans','fAlpha','fDist','class'
+]
+df = pd.read_csv("magic.csv", names=columns)
+print(df.isnull().sum())
+print(df.head())
+df_before = df.copy()
+g=df[df["class"] == "g"]
+h=df[df["class"] == "h"]
+g=g.sample(len(h), random_state=42)
+df_after = pd.concat([g, h])
+df_after["class"] = df_after["class"].map({"g":1, "h":0})
+plt.figure(figsize=(12,5))
+plt.subplot(1,2,1)
+df_before["class"].value_counts().sort_index().plot(
+    kind="bar", color=['skyblue','salmon']
+)
+plt.title("Before Balancing")
+plt.xlabel("Class")
+plt.ylabel("Count")
+plt.subplot(1,2,2)
+df_after["class"].value_counts().sort_index().plot(
+    kind="bar", color=['skyblue','salmon']
+)
+plt.title("After Balancing")
+plt.xlabel("Class")
+plt.ylabel("Count")
+plt.tight_layout()
+plt.show()
+df =df.sample(frac=1, random_state=42)
+print(df)
+
+
+X=df.drop("class", axis=1)
+y=df["class"]
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.30, random_state=42, stratify=y)
+    
+dt=DecisionTreeClassifier(random_state=42)
+dt.fit(X_train, y_train)
+y_pred_dt=dt.predict(X_test)
+print("Decision Tree Accuracy:", accuracy_score(y_test, y_pred_dt))
+print(confusion_matrix(y_test, y_pred_dt))
+ada=AdaBoostClassifier(random_state=42)
+par_ada={'n_estimators': [50, 100, 150, 200]}
+g_ada=GridSearchCV(ada, par_ada, cv=5)
+g_ada.fit(X_train, y_train)
+b_ada=g_ada.best_estimator_
+y_pred_ada=b_ada.predict(X_test)
+print("AdaBoost Accuracy:", accuracy_score(y_test, y_pred_ada))
+print(confusion_matrix(y_test, y_pred_ada))
+rf=RandomForestClassifier(random_state=42)
+par_rf={'n_estimators': [50, 100, 200]}
+g_rf=GridSearchCV(rf, par_rf, cv=5)
+g_rf.fit(X_train, y_train)
+b_rf=g_rf.best_estimator_
+y_pred_rf = b_rf.predict(X_test)
+print("Random Forest Accuracy:", accuracy_score(y_test, y_pred_rf))
+print(confusion_matrix(y_test, y_pred_rf))
+nb=GaussianNB()
+nb.fit(X_train, y_train)
+y_pred_nb = nb.predict(X_test)
+print("Naive Bayes Accuracy:", accuracy_score(y_test, y_pred_nb))
+print(confusion_matrix(y_test, y_pred_nb))
+def evaluate_model( model, X_test, y_test):
+    y_pred=model.predict(X_test)
+    name = model.__class__.__name__
+    print("Accuracy:", accuracy_score(y_test, y_pred))
+    print("Classification Report:")
+    print(classification_report(y_test, y_pred))
+    cm=confusion_matrix(y_test, y_pred)
+    plt.figure()
+    sns.heatmap(cm, annot=True, fmt='d')
+    plt.title(f"{name} - Confusion Matrix")
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    plt.show()
+evaluate_model(dt,X_test,y_test)
+evaluate_model(b_ada,X_test,y_test)
+evaluate_model(b_rf,X_test,y_test)
+evaluate_model(nb,X_test,y_test)
